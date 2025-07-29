@@ -1,2 +1,7 @@
-your_private_key_1
-your_private_key_2
+# Add your private keys here, one per line
+# Example format:
+# 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+# 0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890
+
+your_private_key_1_here
+your_private_key_2_here
