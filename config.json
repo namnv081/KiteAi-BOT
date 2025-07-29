@@ -1,0 +1,26 @@
+{
+    "claim_interval": 3600,
+    "max_retries": 3,
+    "timeout": 30,
+    "selected_faucet": "sepolia",
+    "delay_between_accounts": {
+        "min": 10,
+        "max": 30
+    },
+    "retry_delay": 60,
+    "balance_check_delay": 30,
+    "logging": {
+        "enable_file_logging": false,
+        "log_file": "bot.log"
+    },
+    "faucets": {
+        "sepolia": {
+            "daily_limit": 0.5,
+            "cooldown": 86400
+        },
+        "goerli": {
+            "daily_limit": 0.1,
+            "cooldown": 86400
+        }
+    }
+}
