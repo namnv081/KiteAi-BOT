@@ -14,23 +14,51 @@ init(autoreset=True)
 
 class EthFaucetBot:
     def __init__(self):
-        # Cấu hình các faucet ETH testnet phổ biến
+        # Cấu hình các faucet ETH testnet
         self.faucets = {
-            "sepolia": {
-                "name": "Sepolia Testnet",
+            "simulator": {
+                "name": "Test Faucet Simulator (Local)",
                 "rpc_url": "https://ethereum-sepolia-rpc.publicnode.com",
                 "explorer": "https://sepolia.etherscan.io/tx/",
                 "chain_id": 11155111,
-                "faucet_url": "https://sepoliafaucet.com/api/claim",
-                "site_key": "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"  # Test site key
+                "faucet_url": "http://localhost:8080/api/claim",
+                "site_key": "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI",  # Test site key
+                "type": "api",
+                "amount": "0.05-0.5 ETH",
+                "cooldown": "1 hour"
             },
-            "goerli": {
-                "name": "Goerli Testnet", 
-                "rpc_url": "https://ethereum-goerli-rpc.publicnode.com",
-                "explorer": "https://goerli.etherscan.io/tx/",
-                "chain_id": 5,
-                "faucet_url": "https://goerlifaucet.com/api/claim",
-                "site_key": "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
+            "sepolia_alchemy": {
+                "name": "Sepolia Testnet (Alchemy)",
+                "rpc_url": "https://ethereum-sepolia-rpc.publicnode.com",
+                "explorer": "https://sepolia.etherscan.io/tx/",
+                "chain_id": 11155111,
+                "faucet_url": "https://sepoliafaucet.com/",
+                "site_key": "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI",  # Test site key
+                "type": "web_form",
+                "amount": "0.5 ETH",
+                "cooldown": "24 hours"
+            },
+            "sepolia_quicknode": {
+                "name": "Sepolia Testnet (QuickNode)",
+                "rpc_url": "https://ethereum-sepolia-rpc.publicnode.com", 
+                "explorer": "https://sepolia.etherscan.io/tx/",
+                "chain_id": 11155111,
+                "faucet_url": "https://faucet.quicknode.com/ethereum/sepolia",
+                "site_key": "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI",
+                "type": "web_form", 
+                "amount": "0.1 ETH",
+                "cooldown": "24 hours"
+            },
+            "sepolia_chainlink": {
+                "name": "Sepolia Testnet (Chainlink)",
+                "rpc_url": "https://ethereum-sepolia-rpc.publicnode.com",
+                "explorer": "https://sepolia.etherscan.io/tx/",
+                "chain_id": 11155111,
+                "faucet_url": "https://faucets.chain.link/sepolia",
+                "site_key": "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI",
+                "type": "web_form",
+                "amount": "0.1 ETH", 
+                "cooldown": "24 hours"
             }
         }
         
@@ -431,15 +459,40 @@ class EthFaucetBot:
     def select_faucet(self):
         """Cho phép user chọn faucet"""
         print(f"\n{Fore.YELLOW}Available Faucets:")
+        print("-" * 70)
+        
         for i, (key, faucet) in enumerate(self.faucets.items(), 1):
-            print(f"{Fore.WHITE}{i}. {faucet['name']}")
+            status_icon = "🟢" if key == "simulator" else "🟡"
+            type_icon = "🔧" if faucet.get('type') == 'api' else "🌐"
+            
+            print(f"{Fore.WHITE}{i}. {status_icon} {faucet['name']}")
+            print(f"   {type_icon} Type: {faucet.get('type', 'web_form').title()}")
+            print(f"   💰 Amount: {faucet.get('amount', 'Unknown')}")
+            print(f"   ⏰ Cooldown: {faucet.get('cooldown', 'Unknown')}")
+            
+            if key == "simulator":
+                print(f"   {Fore.GREEN}✅ Ready to test (local simulator){Style.RESET_ALL}")
+            else:
+                print(f"   {Fore.YELLOW}⚠️  May require manual interaction{Style.RESET_ALL}")
+            print()
+        
+        print(f"{Fore.CYAN}💡 Recommendation: Start with option 1 (Simulator) for testing")
         
         while True:
             try:
                 choice = int(input(f"\n{Fore.CYAN}Select faucet (1-{len(self.faucets)}): "))
                 if 1 <= choice <= len(self.faucets):
                     selected_key = list(self.faucets.keys())[choice - 1]
-                    return self.faucets[selected_key]
+                    selected_faucet = self.faucets[selected_key]
+                    
+                    if selected_key != "simulator":
+                        print(f"\n{Fore.YELLOW}⚠️  Warning: {selected_faucet['name']} may not work with automated requests")
+                        print(f"{Fore.YELLOW}   Most real faucets require manual captcha solving via web interface")
+                        confirm = input(f"{Fore.CYAN}Continue anyway? (y/N): ").strip().lower()
+                        if confirm != 'y':
+                            continue
+                    
+                    return selected_faucet
                 else:
                     print(f"{Fore.RED}Invalid choice. Please select 1-{len(self.faucets)}")
             except ValueError:

@@ -84,7 +84,18 @@ your_2captcha_api_key_here
 
 ## 🚀 Cách sử dụng
 
-### Chạy bot
+### Chạy demo (Khuyến nghị cho lần đầu)
+
+```bash
+python demo.py
+```
+
+Demo sẽ tự động:
+- Khởi động faucet simulator local
+- Cấu hình demo accounts và 2captcha key
+- Chạy bot để test
+
+### Chạy bot thực
 
 ```bash
 python eth_faucet_bot.py
