@@ -125,53 +125,130 @@ class EthFaucetBot:
             self.log(f"{Fore.RED}✗ 2captcha_key.txt file not found")
             return False
 
-    async def solve_recaptcha(self, site_key, page_url):
-        """Giải reCAPTCHA sử dụng 2captcha service"""
+    async def check_2captcha_balance(self):
+        """Kiểm tra balance 2captcha"""
+        if not self.captcha_key:
+            return None
+        
+        try:
+            async with ClientSession(timeout=ClientTimeout(total=10)) as session:
+                async with session.get(f"{self.CAPTCHA_API_URL}/res.php?key={self.captcha_key}&action=getbalance") as response:
+                    balance_text = await response.text()
+                    
+                if balance_text.startswith('ERROR'):
+                    self.log(f"{Fore.RED}✗ 2captcha balance check failed: {balance_text}")
+                    return None
+                else:
+                    balance = float(balance_text)
+                    self.log(f"{Fore.CYAN}💰 2captcha balance: ${balance:.4f}")
+                    return balance
+                    
+        except Exception as e:
+            self.log(f"{Fore.YELLOW}⚠ Could not check 2captcha balance: {str(e)}")
+            return None
+
+    async def solve_recaptcha(self, site_key, page_url, max_retries=3):
+        """Giải reCAPTCHA sử dụng 2captcha service với retry logic"""
         if not self.captcha_key:
             self.log(f"{Fore.RED}✗ No 2captcha API key provided")
             return None
 
-        try:
-            async with ClientSession(timeout=ClientTimeout(total=30)) as session:
-                # Gửi captcha để giải
-                submit_data = {
-                    'key': self.captcha_key,
-                    'method': 'userrecaptcha',
-                    'googlekey': site_key,
-                    'pageurl': page_url,
-                    'json': 1
-                }
-                
-                async with session.post(f"{self.CAPTCHA_API_URL}/in.php", data=submit_data) as response:
-                    result = await response.json()
+        # Kiểm tra balance trước khi giải captcha
+        balance = await self.check_2captcha_balance()
+        if balance is not None and balance < 0.001:
+            self.log(f"{Fore.RED}✗ Insufficient 2captcha balance: ${balance:.4f}")
+            return None
+
+        for retry in range(max_retries):
+            if retry > 0:
+                self.log(f"{Fore.YELLOW}🔄 Retrying captcha solve... Attempt {retry + 1}/{max_retries}")
+                await asyncio.sleep(5)
+
+            try:
+                async with ClientSession(timeout=ClientTimeout(total=60)) as session:
+                    # Gửi captcha để giải
+                    submit_data = {
+                        'key': self.captcha_key,
+                        'method': 'userrecaptcha',
+                        'googlekey': site_key,
+                        'pageurl': page_url,
+                        'json': 1
+                    }
                     
-                if result['status'] != 1:
-                    self.log(f"{Fore.RED}✗ Failed to submit captcha: {result.get('error_text', 'Unknown error')}")
-                    return None
-                
-                captcha_id = result['request']
-                self.log(f"{Fore.YELLOW}⏳ Solving captcha... ID: {captcha_id}")
-                
-                # Chờ kết quả
-                for attempt in range(30):  # Tối đa 5 phút
-                    await asyncio.sleep(10)
-                    
-                    async with session.get(f"{self.CAPTCHA_API_URL}/res.php?key={self.captcha_key}&action=get&id={captcha_id}&json=1") as response:
+                    self.log(f"{Fore.CYAN}📤 Submitting captcha to 2captcha...")
+                    async with session.post(f"{self.CAPTCHA_API_URL}/in.php", data=submit_data) as response:
+                        if response.status != 200:
+                            self.log(f"{Fore.RED}✗ HTTP error submitting captcha: {response.status}")
+                            continue
+                            
                         result = await response.json()
                         
-                    if result['status'] == 1:
-                        self.log(f"{Fore.GREEN}✓ Captcha solved successfully")
-                        return result['request']
-                    elif result['error_text'] != 'CAPCHA_NOT_READY':
-                        self.log(f"{Fore.RED}✗ Captcha solving failed: {result.get('error_text')}")
-                        return None
-                
-                self.log(f"{Fore.RED}✗ Captcha solving timeout")
-                return None
-                
-        except Exception as e:
-            self.log(f"{Fore.RED}✗ Error solving captcha: {str(e)}")
-            return None
+                    if result.get('status') != 1:
+                        error_msg = result.get('error_text', result.get('request', 'Unknown error'))
+                        self.log(f"{Fore.RED}✗ Failed to submit captcha: {error_msg}")
+                        
+                        # Xử lý các lỗi cụ thể
+                        if error_msg in ['ERROR_ZERO_BALANCE', 'ERROR_NO_SLOT_AVAILABLE']:
+                            self.log(f"{Fore.RED}💳 2captcha service issue: {error_msg}")
+                            return None
+                        continue
+                    
+                    captcha_id = result['request']
+                    self.log(f"{Fore.YELLOW}⏳ Solving captcha... ID: {captcha_id}")
+                    
+                    # Chờ kết quả với timeout thông minh
+                    max_wait_time = 300  # 5 phút
+                    wait_interval = 10   # Kiểm tra mỗi 10 giây
+                    waited_time = 0
+                    
+                    while waited_time < max_wait_time:
+                        await asyncio.sleep(wait_interval)
+                        waited_time += wait_interval
+                        
+                        try:
+                            async with session.get(f"{self.CAPTCHA_API_URL}/res.php?key={self.captcha_key}&action=get&id={captcha_id}&json=1") as response:
+                                if response.status != 200:
+                                    self.log(f"{Fore.YELLOW}⚠ HTTP error checking captcha result: {response.status}")
+                                    continue
+                                    
+                                result = await response.json()
+                                
+                        except Exception as e:
+                            self.log(f"{Fore.YELLOW}⚠ Error checking captcha result: {str(e)}")
+                            continue
+                        
+                        if result.get('status') == 1:
+                            self.log(f"{Fore.GREEN}✓ Captcha solved successfully in {waited_time}s")
+                            return result['request']
+                        elif result.get('request') == 'CAPCHA_NOT_READY':
+                            # Vẫn đang xử lý, tiếp tục chờ
+                            progress_bar = "█" * (waited_time // 30) + "░" * (10 - waited_time // 30)
+                            self.log(f"{Fore.CYAN}⏳ [{progress_bar}] Waiting... {waited_time}s/{max_wait_time}s")
+                            continue
+                        else:
+                            error_msg = result.get('request', 'Unknown error')
+                            self.log(f"{Fore.RED}✗ Captcha solving failed: {error_msg}")
+                            break
+                    
+                    if waited_time >= max_wait_time:
+                        self.log(f"{Fore.RED}✗ Captcha solving timeout after {max_wait_time}s")
+                        # Report bad captcha để không bị charge
+                        try:
+                            async with session.get(f"{self.CAPTCHA_API_URL}/res.php?key={self.captcha_key}&action=reportbad&id={captcha_id}") as response:
+                                self.log(f"{Fore.YELLOW}📝 Reported bad captcha to get refund")
+                        except:
+                            pass
+                        continue
+                        
+            except asyncio.TimeoutError:
+                self.log(f"{Fore.RED}✗ Timeout connecting to 2captcha service")
+                continue
+            except Exception as e:
+                self.log(f"{Fore.RED}✗ Error solving captcha: {str(e)}")
+                continue
+        
+        self.log(f"{Fore.RED}✗ Failed to solve captcha after {max_retries} attempts")
+        return None
 
     async def check_balance(self, address, faucet_config):
         """Kiểm tra balance hiện tại của address"""
@@ -184,73 +261,150 @@ class EthFaucetBot:
             self.log(f"{Fore.RED}✗ Error checking balance: {str(e)}")
             return 0
 
-    async def claim_faucet(self, account, faucet_config):
-        """Claim ETH từ faucet"""
+    async def claim_faucet(self, account, faucet_config, max_retries=2):
+        """Claim ETH từ faucet với retry logic"""
         address = account['address']
         
-        try:
-            # Kiểm tra balance trước khi claim
-            balance_before = await self.check_balance(address, faucet_config)
-            self.log(f"{Fore.CYAN}💰 Current balance: {balance_before:.6f} ETH")
+        for attempt in range(max_retries):
+            if attempt > 0:
+                self.log(f"{Fore.YELLOW}🔄 Retrying claim... Attempt {attempt + 1}/{max_retries}")
+                await asyncio.sleep(10)
             
-            # Giải captcha
-            self.log(f"{Fore.YELLOW}🔄 Solving captcha for {address[:10]}...")
-            captcha_token = await self.solve_recaptcha(
-                faucet_config['site_key'], 
-                faucet_config['faucet_url']
-            )
-            
-            if not captcha_token:
-                return False
-            
-            # Gửi request claim
-            async with ClientSession(timeout=ClientTimeout(total=30)) as session:
-                claim_data = {
-                    'address': address,
-                    'captcha': captcha_token
-                }
+            try:
+                # Kiểm tra balance trước khi claim
+                balance_before = await self.check_balance(address, faucet_config)
+                self.log(f"{Fore.CYAN}💰 Current balance: {balance_before:.6f} ETH")
                 
-                async with session.post(
-                    faucet_config['faucet_url'], 
-                    json=claim_data, 
-                    headers=self.headers
-                ) as response:
-                    
-                    if response.status == 200:
-                        result = await response.json()
-                        
-                        if result.get('success'):
-                            tx_hash = result.get('txHash')
-                            self.log(f"{Fore.GREEN}✓ Claim successful!")
+                # Giải captcha
+                self.log(f"{Fore.YELLOW}🔄 Solving captcha for {address[:10]}...")
+                captcha_token = await self.solve_recaptcha(
+                    faucet_config['site_key'], 
+                    faucet_config['faucet_url']
+                )
+                
+                if not captcha_token:
+                    self.log(f"{Fore.RED}✗ Failed to solve captcha")
+                    if attempt < max_retries - 1:
+                        continue
+                    return False
+                
+                # Gửi request claim với retry
+                claim_success = False
+                for claim_attempt in range(3):  # Retry claim request 3 lần
+                    try:
+                        async with ClientSession(timeout=ClientTimeout(total=45)) as session:
+                            claim_data = {
+                                'address': address,
+                                'captcha': captcha_token
+                            }
                             
-                            if tx_hash:
-                                explorer_url = f"{faucet_config['explorer']}{tx_hash}"
-                                self.log(f"{Fore.BLUE}🔗 Transaction: {explorer_url}")
-                            
-                            # Chờ một chút rồi kiểm tra balance mới
-                            await asyncio.sleep(30)
-                            balance_after = await self.check_balance(address, faucet_config)
-                            received = balance_after - balance_before
-                            
-                            if received > 0:
-                                self.log(f"{Fore.GREEN}💎 Received: {received:.6f} ETH")
-                                self.log(f"{Fore.GREEN}💰 New balance: {balance_after:.6f} ETH")
-                            
-                            return True
+                            self.log(f"{Fore.CYAN}📤 Submitting claim request...")
+                            async with session.post(
+                                faucet_config['faucet_url'], 
+                                json=claim_data, 
+                                headers=self.headers
+                            ) as response:
+                                
+                                response_text = await response.text()
+                                
+                                if response.status == 200:
+                                    try:
+                                        result = await response.json()
+                                    except:
+                                        # Nếu không parse được JSON, thử với text response
+                                        self.log(f"{Fore.YELLOW}⚠ Non-JSON response: {response_text[:100]}...")
+                                        if "success" in response_text.lower() or "sent" in response_text.lower():
+                                            claim_success = True
+                                            break
+                                        else:
+                                            continue
+                                    
+                                    if result.get('success') or result.get('status') == 'success':
+                                        tx_hash = result.get('txHash') or result.get('hash') or result.get('transactionHash')
+                                        self.log(f"{Fore.GREEN}✓ Claim successful!")
+                                        
+                                        if tx_hash:
+                                            explorer_url = f"{faucet_config['explorer']}{tx_hash}"
+                                            self.log(f"{Fore.BLUE}🔗 Transaction: {explorer_url}")
+                                        
+                                        claim_success = True
+                                        break
+                                    else:
+                                        error_msg = result.get('message') or result.get('error') or 'Unknown error'
+                                        self.log(f"{Fore.RED}✗ Claim failed: {error_msg}")
+                                        
+                                        # Kiểm tra lỗi rate limit
+                                        if any(keyword in error_msg.lower() for keyword in ['rate limit', 'too many', 'wait', 'cooldown']):
+                                            self.log(f"{Fore.YELLOW}⏰ Rate limited, this is normal")
+                                            return False
+                                        
+                                        if claim_attempt < 2:
+                                            await asyncio.sleep(5)
+                                            continue
+                                        else:
+                                            return False
+                                            
+                                elif response.status == 429:
+                                    self.log(f"{Fore.YELLOW}⚠ Rate limited (HTTP 429)")
+                                    return False
+                                elif response.status >= 500:
+                                    self.log(f"{Fore.YELLOW}⚠ Server error: {response.status}, retrying...")
+                                    if claim_attempt < 2:
+                                        await asyncio.sleep(10)
+                                        continue
+                                    else:
+                                        return False
+                                else:
+                                    self.log(f"{Fore.RED}✗ HTTP Error: {response.status}")
+                                    self.log(f"{Fore.RED}Response: {response_text[:200]}...")
+                                    if claim_attempt < 2:
+                                        await asyncio.sleep(5)
+                                        continue
+                                    else:
+                                        return False
+                                        
+                    except asyncio.TimeoutError:
+                        self.log(f"{Fore.RED}✗ Request timeout")
+                        if claim_attempt < 2:
+                            await asyncio.sleep(5)
+                            continue
                         else:
-                            error_msg = result.get('message', 'Unknown error')
-                            self.log(f"{Fore.RED}✗ Claim failed: {error_msg}")
                             return False
+                    except Exception as e:
+                        self.log(f"{Fore.RED}✗ Request error: {str(e)}")
+                        if claim_attempt < 2:
+                            await asyncio.sleep(5)
+                            continue
+                        else:
+                            return False
+                
+                if claim_success:
+                    # Chờ một chút rồi kiểm tra balance mới
+                    self.log(f"{Fore.CYAN}⏳ Waiting for transaction confirmation...")
+                    await asyncio.sleep(self.config.get('balance_check_delay', 30))
+                    
+                    balance_after = await self.check_balance(address, faucet_config)
+                    received = balance_after - balance_before
+                    
+                    if received > 0:
+                        self.log(f"{Fore.GREEN}💎 Received: {received:.6f} ETH")
+                        self.log(f"{Fore.GREEN}💰 New balance: {balance_after:.6f} ETH")
                     else:
-                        self.log(f"{Fore.RED}✗ HTTP Error: {response.status}")
-                        return False
+                        self.log(f"{Fore.YELLOW}⚠ Balance unchanged, transaction may be pending")
+                    
+                    return True
+                else:
+                    if attempt < max_retries - 1:
+                        continue
+                    return False
                         
-        except ClientResponseError as e:
-            self.log(f"{Fore.RED}✗ Request error: {e}")
-            return False
-        except Exception as e:
-            self.log(f"{Fore.RED}✗ Unexpected error: {str(e)}")
-            return False
+            except Exception as e:
+                self.log(f"{Fore.RED}✗ Unexpected error: {str(e)}")
+                if attempt < max_retries - 1:
+                    continue
+                return False
+        
+        return False
 
     def mask_address(self, address):
         """Ẩn một phần address để bảo mật"""

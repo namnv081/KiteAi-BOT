@@ -221,6 +221,17 @@ Thường là 24h cho mỗi address
 Kiểm tra balance 2captcha
 ```
 
+**"Error solving captcha: 'error_text'"**
+```bash
+# Chạy script debug để kiểm tra 2captcha
+python test_2captcha.py
+
+# Các lỗi thường gặp:
+# - ERROR_WRONG_USER_KEY: API key không hợp lệ
+# - ERROR_ZERO_BALANCE: Hết tiền trong account
+# - ERROR_NO_SLOT_AVAILABLE: Server 2captcha quá tải
+```
+
 ## 📈 Tips tối ưu
 
 1. **Sử dụng nhiều ví**: Tăng tổng amount claim được
