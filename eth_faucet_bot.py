@@ -4,6 +4,13 @@ from aiohttp import ClientSession, ClientTimeout, ClientResponseError
 from fake_useragent import FakeUserAgent
 from datetime import datetime, timezone
 from colorama import *
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
 import asyncio
 import json
 import random
@@ -14,51 +21,56 @@ init(autoreset=True)
 
 class EthFaucetBot:
     def __init__(self):
-        # Cấu hình các faucet ETH testnet
+        # Cấu hình các faucet ETH testnet thực tế
         self.faucets = {
-            "simulator": {
-                "name": "Test Faucet Simulator (Local)",
-                "rpc_url": "https://ethereum-sepolia-rpc.publicnode.com",
-                "explorer": "https://sepolia.etherscan.io/tx/",
-                "chain_id": 11155111,
-                "faucet_url": "http://localhost:8080/api/claim",
-                "site_key": "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI",  # Test site key
-                "type": "api",
-                "amount": "0.05-0.5 ETH",
-                "cooldown": "1 hour"
-            },
-            "sepolia_alchemy": {
-                "name": "Sepolia Testnet (Alchemy)",
-                "rpc_url": "https://ethereum-sepolia-rpc.publicnode.com",
+            "alchemy_sepolia": {
+                "name": "Alchemy Sepolia Faucet",
+                "rpc_url": "https://eth-sepolia.g.alchemy.com/v2/demo",
                 "explorer": "https://sepolia.etherscan.io/tx/",
                 "chain_id": 11155111,
                 "faucet_url": "https://sepoliafaucet.com/",
-                "site_key": "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI",  # Test site key
-                "type": "web_form",
+                "site_key": "6LfBuxcqAAAAAODQjy7d1elks2Z3SOL-oBBJ-0Oy",
+                "type": "web_automation",
                 "amount": "0.5 ETH",
-                "cooldown": "24 hours"
+                "cooldown": "24 hours",
+                "requires_login": True,
+                "login_url": "https://auth.alchemy.com/signin"
             },
-            "sepolia_quicknode": {
-                "name": "Sepolia Testnet (QuickNode)",
-                "rpc_url": "https://ethereum-sepolia-rpc.publicnode.com", 
-                "explorer": "https://sepolia.etherscan.io/tx/",
-                "chain_id": 11155111,
-                "faucet_url": "https://faucet.quicknode.com/ethereum/sepolia",
-                "site_key": "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI",
-                "type": "web_form", 
-                "amount": "0.1 ETH",
-                "cooldown": "24 hours"
-            },
-            "sepolia_chainlink": {
-                "name": "Sepolia Testnet (Chainlink)",
+            "chainlink_sepolia": {
+                "name": "Chainlink Sepolia Faucet",
                 "rpc_url": "https://ethereum-sepolia-rpc.publicnode.com",
                 "explorer": "https://sepolia.etherscan.io/tx/",
                 "chain_id": 11155111,
                 "faucet_url": "https://faucets.chain.link/sepolia",
                 "site_key": "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI",
-                "type": "web_form",
-                "amount": "0.1 ETH", 
-                "cooldown": "24 hours"
+                "type": "web_automation",
+                "amount": "0.1 ETH",
+                "cooldown": "24 hours",
+                "requires_login": False
+            },
+            "quicknode_sepolia": {
+                "name": "QuickNode Sepolia Faucet", 
+                "rpc_url": "https://ethereum-sepolia-rpc.publicnode.com",
+                "explorer": "https://sepolia.etherscan.io/tx/",
+                "chain_id": 11155111,
+                "faucet_url": "https://faucet.quicknode.com/ethereum/sepolia",
+                "site_key": "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI",
+                "type": "web_automation",
+                "amount": "0.05 ETH",
+                "cooldown": "12 hours",
+                "requires_login": False
+            },
+            "sepolia_dev": {
+                "name": "Sepolia.dev Faucet",
+                "rpc_url": "https://rpc.sepolia.dev",
+                "explorer": "https://sepolia.etherscan.io/tx/",
+                "chain_id": 11155111,
+                "faucet_url": "https://sepolia.dev/",
+                "site_key": "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI",
+                "type": "web_automation",
+                "amount": "0.1 ETH",
+                "cooldown": "24 hours",
+                "requires_login": False
             }
         }
         

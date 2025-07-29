@@ -1,24 +1,26 @@
 # ETH Testnet Faucet Bot
 
-🤖 **Auto ETH Testnet Faucet Bot with 2Captcha Integration**
+🤖 **Auto ETH Testnet Faucet Bot with Web Automation**
 
-Một bot tự động để claim ETH từ các faucet testnet phổ biến với tích hợp dịch vụ giải captcha 2captcha.
+Một bot tự động để claim ETH từ các faucet testnet thực tế sử dụng Selenium web automation và tích hợp 2captcha.
 
 ## ✨ Tính năng chính
 
-- 🔄 **Tự động claim ETH** từ nhiều faucet testnet
+- 🌐 **Web Automation** - Tương tác trực tiếp với faucet websites
+- 🔄 **Tự động claim ETH** từ các faucet testnet thực tế
 - 🧩 **Tích hợp 2Captcha** để giải reCAPTCHA tự động
 - 💼 **Hỗ trợ multi-account** - quản lý nhiều ví cùng lúc
 - ⚡ **Kiểm tra balance** trước và sau khi claim
-- 🔁 **Chạy liên tục** với chu kỳ tùy chỉnh
 - 📊 **Báo cáo chi tiết** về kết quả claim
-- 🎯 **Hỗ trợ nhiều testnet**: Sepolia, Goerli
-- ⏰ **Delay ngẫu nhiên** giữa các account để tránh detect
+- 🎯 **Faucets được hỗ trợ**: Chainlink, QuickNode, Alchemy
+- 🤖 **Chrome automation** với Selenium WebDriver
+- ⏰ **Delay thông minh** để tránh detection
 
 ## 🛠 Yêu cầu hệ thống
 
 - **Python 3.8+**
-- **2Captcha API Key** (có thể mua tại [2captcha.com](https://2captcha.com))
+- **Google Chrome** browser
+- **2Captcha API Key** (tùy chọn - cho tự động giải captcha)
 - **Private keys** của các ví ETH cần claim
 
 ## 📦 Cài đặt
@@ -84,18 +86,20 @@ your_2captcha_api_key_here
 
 ## 🚀 Cách sử dụng
 
-### Chạy demo (Khuyến nghị cho lần đầu)
+### Chạy Web Faucet Bot (Claim ETH thực tế)
 
 ```bash
-python demo.py
+python web_faucet_bot.py
 ```
 
-Demo sẽ tự động:
-- Khởi động faucet simulator local
-- Cấu hình demo accounts và 2captcha key
-- Chạy bot để test
+Bot sẽ:
+- Mở Chrome browser tự động
+- Cho phép chọn faucet (Chainlink, QuickNode, Alchemy)
+- Tự động điền address và submit
+- Giải captcha nếu có 2captcha key
+- Kiểm tra balance trước/sau claim
 
-### Chạy bot thực
+### Chạy bot API cũ (Chỉ để test)
 
 ```bash
 python eth_faucet_bot.py
@@ -125,12 +129,13 @@ Select faucet (1-2): 1
    - Hiển thị kết quả
 4. **Chờ chu kỳ tiếp theo**: Bot đợi theo `claim_interval` rồi lặp lại
 
-## 📊 Các testnet được hỗ trợ
+## 📊 Các faucet được hỗ trợ
 
-| Testnet | Chain ID | RPC URL | Faucet Amount |
-|---------|----------|---------|---------------|
-| **Sepolia** | 11155111 | ethereum-sepolia-rpc.publicnode.com | ~0.5 ETH |
-| **Goerli** | 5 | ethereum-goerli-rpc.publicnode.com | ~0.1 ETH |
+| Faucet | Amount | Cooldown | Login Required | Status |
+|--------|--------|----------|----------------|--------|
+| **Chainlink Sepolia** | 0.1 ETH | 24h | ❌ | ✅ Active |
+| **QuickNode Sepolia** | 0.05 ETH | 12h | ❌ | ✅ Active |
+| **Alchemy Sepolia** | 0.5 ETH | 24h | ✅ | ✅ Active |
 
 ## ⚙️ Cấu hình chi tiết
 

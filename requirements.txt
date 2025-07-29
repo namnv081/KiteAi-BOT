@@ -3,3 +3,5 @@ aiohttp>=3.10.0
 eth-account==0.10.0
 fake-useragent==1.4.0
 colorama==0.4.6
+selenium==4.15.2
+webdriver-manager==4.0.1
