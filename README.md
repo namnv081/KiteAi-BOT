@@ -32,8 +32,21 @@ cd eth-faucet-bot
 
 ### 2. Cài đặt dependencies
 
+**🎯 Phương pháp được khuyến nghị (sử dụng script tự động):**
+
 ```bash
+python install.py
+```
+
+**📦 Hoặc cài đặt thủ công:**
+
+```bash
+# Nếu gặp dependency conflicts, thử clean install:
+pip uninstall aiohttp aiohttp-socks web3 eth-account fake-useragent -y
 pip install -r requirements.txt
+
+# Hoặc force reinstall:
+pip install -r requirements.txt --force-reinstall
 ```
 
 ### 3. Cấu hình
@@ -159,6 +172,28 @@ Bot hiển thị log chi tiết:
 4. **Backup private keys**: Luôn backup private keys ở nơi an toàn
 
 ## 🔧 Troubleshooting
+
+### Lỗi dependency conflicts:
+
+**"pip's dependency resolver does not currently take into account all the packages..."**
+```bash
+# Giải pháp 1: Sử dụng script tự động
+python install.py
+
+# Giải pháp 2: Clean install thủ công
+pip uninstall aiohttp aiohttp-socks web3 eth-account fake-useragent -y
+pip install web3==6.15.1
+pip install "aiohttp>=3.10.0"
+pip install eth-account==0.10.0
+pip install fake-useragent==1.4.0
+pip install colorama==0.4.6
+
+# Giải pháp 3: Sử dụng virtual environment
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# hoặc venv\Scripts\activate  # Windows
+pip install -r requirements.txt
+```
 
 ### Lỗi thường gặp:
 
