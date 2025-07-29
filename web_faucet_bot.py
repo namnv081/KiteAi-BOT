@@ -30,6 +30,22 @@ class WebFaucetBot:
     def __init__(self):
         # Cấu hình các faucet thực tế
         self.faucets = {
+            "alchemy": {
+                "name": "Alchemy Sepolia Faucet (Recommended)",
+                "url": "https://www.alchemy.com/faucets/ethereum-sepolia",
+                "rpc_url": "https://eth-sepolia.g.alchemy.com/v2/demo",
+                "explorer": "https://sepolia.etherscan.io/tx/",
+                "chain_id": 11155111,
+                "amount": "up to 1 ETH",
+                "cooldown": "24 hours",
+                "requires_login": False,
+                "selectors": {
+                    "address_input": "input[placeholder*='address' i], input[name*='address' i], input[id*='address' i], input[type='text']",
+                    "submit_button": "button:contains('Send Me ETH'), button:contains('Drip'), button[type='submit']",
+                    "success_message": ".success, .alert-success, [class*='success'], .notification",
+                    "error_message": ".error, .alert-error, [class*='error'], .alert"
+                }
+            },
             "chainlink": {
                 "name": "Chainlink Sepolia Faucet",
                 "url": "https://faucets.chain.link/sepolia",
@@ -60,19 +76,18 @@ class WebFaucetBot:
                     "error_message": ".error, .alert-error, [class*='error']"
                 }
             },
-            "alchemy": {
-                "name": "Alchemy Sepolia Faucet",
-                "url": "https://sepoliafaucet.com/",
-                "rpc_url": "https://eth-sepolia.g.alchemy.com/v2/demo",
+            "infura": {
+                "name": "Infura Sepolia Faucet",
+                "url": "https://www.infura.io/faucet/sepolia",
+                "rpc_url": "https://sepolia.infura.io/v3/demo",
                 "explorer": "https://sepolia.etherscan.io/tx/",
                 "chain_id": 11155111,
                 "amount": "0.5 ETH",
                 "cooldown": "24 hours",
-                "requires_login": True,
-                "login_url": "https://auth.alchemy.com/signin",
+                "requires_login": False,
                 "selectors": {
-                    "address_input": "input[placeholder*='address' i], input[name*='address' i], input[id*='address' i]",
-                    "submit_button": "button:contains('Send Me ETH'), button[type='submit']",
+                    "address_input": "input[placeholder*='address' i], input[name*='address' i], input[id*='address' i], input[type='text']",
+                    "submit_button": "button:contains('RECEIVE'), button:contains('Request'), button[type='submit']",
                     "success_message": ".success, .alert-success, [class*='success']",
                     "error_message": ".error, .alert-error, [class*='error']"
                 }
@@ -284,22 +299,83 @@ class WebFaucetBot:
             
             # Kiểm tra reCAPTCHA
             recaptcha_frames = self.driver.find_elements(By.CSS_SELECTOR, "iframe[src*='recaptcha']")
-            if recaptcha_frames and self.captcha_key:
+            recaptcha_divs = self.driver.find_elements(By.CSS_SELECTOR, ".g-recaptcha, [data-sitekey]")
+            
+            if (recaptcha_frames or recaptcha_divs) and self.captcha_key:
                 self.log(f"{Fore.YELLOW}🧩 Detected reCAPTCHA, solving...")
                 
-                # Extract site key (simplified)
-                site_key = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"  # Default test key
+                # Try to extract real site key
+                site_key = None
+                try:
+                    # Look for data-sitekey attribute
+                    for elem in recaptcha_divs:
+                        if elem.get_attribute('data-sitekey'):
+                            site_key = elem.get_attribute('data-sitekey')
+                            break
+                    
+                    # Look in page source for site key
+                    if not site_key:
+                        page_source = self.driver.page_source
+                        import re
+                        site_key_match = re.search(r'data-sitekey="([^"]+)"', page_source)
+                        if site_key_match:
+                            site_key = site_key_match.group(1)
+                        else:
+                            # Look for sitekey in script
+                            site_key_match = re.search(r'sitekey["\s]*:["\s]*([^"]+)', page_source)
+                            if site_key_match:
+                                site_key = site_key_match.group(1)
+                    
+                    if not site_key:
+                        site_key = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"  # Fallback
+                        self.log(f"{Fore.YELLOW}⚠ Using fallback site key")
+                    else:
+                        self.log(f"{Fore.GREEN}✓ Extracted site key: {site_key[:20]}...")
+                        
+                except Exception as e:
+                    site_key = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
+                    self.log(f"{Fore.YELLOW}⚠ Error extracting site key, using fallback: {e}")
+                
                 captcha_token = await self.solve_recaptcha(site_key, faucet_url)
                 
                 if captcha_token:
-                    # Inject captcha solution
-                    self.driver.execute_script(f"""
-                        document.getElementById('g-recaptcha-response').innerHTML = '{captcha_token}';
-                        if (typeof grecaptcha !== 'undefined') {{
-                            grecaptcha.getResponse = function() {{ return '{captcha_token}'; }};
-                        }}
-                    """)
-                    time.sleep(1)
+                    # Try multiple methods to inject captcha solution
+                    try:
+                        # Method 1: Direct injection
+                        self.driver.execute_script(f"""
+                            var responses = document.getElementsByName('g-recaptcha-response');
+                            for (var i = 0; i < responses.length; i++) {{
+                                responses[i].innerHTML = '{captcha_token}';
+                                responses[i].value = '{captcha_token}';
+                            }}
+                        """)
+                        
+                        # Method 2: Override grecaptcha
+                        self.driver.execute_script(f"""
+                            if (typeof grecaptcha !== 'undefined') {{
+                                grecaptcha.getResponse = function() {{ return '{captcha_token}'; }};
+                                if (grecaptcha.execute) {{
+                                    grecaptcha.execute();
+                                }}
+                            }}
+                        """)
+                        
+                        # Method 3: Trigger callback if exists
+                        self.driver.execute_script(f"""
+                            if (window.recaptchaCallback) {{
+                                window.recaptchaCallback('{captcha_token}');
+                            }}
+                        """)
+                        
+                        self.log(f"{Fore.GREEN}✓ Captcha solution injected")
+                        time.sleep(2)
+                        
+                    except Exception as e:
+                        self.log(f"{Fore.YELLOW}⚠ Error injecting captcha: {e}")
+                        
+            elif recaptcha_frames or recaptcha_divs:
+                self.log(f"{Fore.YELLOW}⚠ reCAPTCHA detected but no 2captcha key - you may need to solve manually")
+                time.sleep(5)  # Give user time to solve manually
             
             # Tìm và click submit button
             submit_button = self.find_element_by_selectors([

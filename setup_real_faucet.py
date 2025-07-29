@@ -93,9 +93,10 @@ def show_instructions():
     print(f"{Fore.RED}• This bot is for educational/testing purposes only")
     
     print(f"\n{Fore.CYAN}💡 Tips:")
-    print(f"{Fore.WHITE}• Chainlink faucet is recommended (no login required)")
+    print(f"{Fore.WHITE}• Alchemy faucet is BEST (up to 1 ETH, no login required)")
     print(f"{Fore.WHITE}• QuickNode has shorter cooldown (12h vs 24h)")
-    print(f"{Fore.WHITE}• Alchemy gives most ETH but requires account login")
+    print(f"{Fore.WHITE}• Chainlink is reliable backup option")
+    print(f"{Fore.WHITE}• Bot will auto-detect and solve captchas if 2captcha key provided")
     print(f"{Fore.WHITE}• Set headless: true in config.json to run without browser window")
 
 def main():

@@ -94,10 +94,11 @@ python web_faucet_bot.py
 
 Bot sẽ:
 - Mở Chrome browser tự động
-- Cho phép chọn faucet (Chainlink, QuickNode, Alchemy)
+- Cho phép chọn faucet (Alchemy, Chainlink, QuickNode, Infura)
 - Tự động điền address và submit
-- Giải captcha nếu có 2captcha key
+- Tự động detect và giải captcha nếu có 2captcha key
 - Kiểm tra balance trước/sau claim
+- Tự động extract transaction hash
 
 ### Chạy bot API cũ (Chỉ để test)
 
@@ -133,9 +134,10 @@ Select faucet (1-2): 1
 
 | Faucet | Amount | Cooldown | Login Required | Status |
 |--------|--------|----------|----------------|--------|
+| **Alchemy Sepolia** | up to 1 ETH | 24h | ❌ | ⭐ Recommended |
 | **Chainlink Sepolia** | 0.1 ETH | 24h | ❌ | ✅ Active |
 | **QuickNode Sepolia** | 0.05 ETH | 12h | ❌ | ✅ Active |
-| **Alchemy Sepolia** | 0.5 ETH | 24h | ✅ | ✅ Active |
+| **Infura Sepolia** | 0.5 ETH | 24h | ❌ | ✅ Active |
 
 ## ⚙️ Cấu hình chi tiết
 
